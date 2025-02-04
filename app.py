@@ -108,7 +108,7 @@ def initiate_splitwise_oauth():
     return jsonify({"url": url, "state": state})
 
 # Callback endpoint to handle Splitwise OAuth redirect and exchange code for token
-@app.route('/callback', methods=['GET'])
+@app.route('/redirect_url', methods=['GET'])
 def handle_splitwise_callback():
     # Get the code and state from the query parameters
     code = request.args.get('code')
@@ -127,7 +127,7 @@ def handle_splitwise_callback():
     try:
         token_info = s.getOAuth2AccessToken(code, redirect_uri)
         access_token = token_info.get('access_token')
-        print(a)
+        print(access_token)
         # Return the access token as part of the response
         return jsonify({"access_token": access_token}), 200
     except Exception as e:
