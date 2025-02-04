@@ -3,3 +3,4 @@ firebase-admin
 flask-cors
 splitwise
 python-dotenv
+gunicorn
