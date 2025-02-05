@@ -125,7 +125,7 @@ def handle_splitwise_callback():
 
     # Exchange the code for an access token
     try:
-        token_info = s.getOAuth2AccessToken(code, redirect_uri)
+        token_info = s.getOAuth2AccessToken(code, request.base_url)
         access_token = token_info.get('access_token')
         print(access_token)
         # Return the access token as part of the response
