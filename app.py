@@ -1,7 +1,7 @@
 import os
 from flask import Flask, request, jsonify
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials,firestore, exceptions
 from flask_cors import CORS
 from splitwise import Splitwise
 from dotenv import load_dotenv
@@ -12,13 +12,17 @@ FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH")
 SPLITWISE_CONSUMER_KEY = os.getenv("SPLITWISE_CONSUMER_KEY")
 SPLITWISE_CONSUMER_SECRET = os.getenv("SPLITWISE_CONSUMER_SECRET")
 
+
+
 print(FIREBASE_CREDENTIALS_PATH, SPLITWISE_CONSUMER_KEY, SPLITWISE_CONSUMER_SECRET)
 cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
 firebase_admin.initialize_app(cred)
 s = Splitwise(SPLITWISE_CONSUMER_KEY, SPLITWISE_CONSUMER_SECRET)
 
-# Initialize Firestore client
-db = firestore.client()
+try:
+    db = firestore.client()
+except Exception as e:
+    print(f"Error initializing Firestore client: {e}")
 
 app = Flask(__name__)
 CORS(app)
@@ -75,15 +79,17 @@ def get_expense():
         return jsonify({"error": "Email parameter is required"}), 400
     
     try:
+
         # Reference the collection where expenses are stored
         expenses_ref = db.collection('expenses')
-        
         # Query Firestore for documents where 'email' matches the provided email
-        query = expenses_ref.where('email', '==', email).stream()
-        
+
+        query = expenses_ref.where("email", "==", email).stream()
+
         # Prepare a list to hold retrieved records
         expenses = []
         for doc in query:
+            print(doc)
             expense = doc.to_dict()
             expense['id'] = doc.id  
             expenses.append(expense)
@@ -91,6 +97,7 @@ def get_expense():
         return jsonify(expenses), 200
     
     except Exception as e:
+        print(e)
         return jsonify({"error": str(e)}), 500
 
 # Endpoint to initiate Splitwise OAuth flow
@@ -107,31 +114,40 @@ def initiate_splitwise_oauth():
     # Optionally, store the state for later verification
     return jsonify({"url": url, "state": state})
 
-# Callback endpoint to handle Splitwise OAuth redirect and exchange code for token
-@app.route('/redirect_url', methods=['GET'])
+@app.route('/callback', methods=['GET'])
 def handle_splitwise_callback():
     # Get the code and state from the query parameters
     code = request.args.get('code')
     state = request.args.get('state')
-    
+
     if not code or not state:
         return jsonify({"error": "Missing code or state parameter"}), 400
 
-    # Verify state (ensure it's the same as the one generated during the OAuth flow)
-    # This is a simple check; in a real application, store and verify the state securely
-    # saved_state = 'expected_state'  # Replace this with your state storage mechanism
-    # if state != saved_state:
-    #     return jsonify({"error": "State mismatch"}), 400
-
-    # Exchange the code for an access token
     try:
-        token_info = s.getOAuth2AccessToken(code, request.base_url)
+        token_info = s.getOAuth2AccessToken(code, 'exp://10.0.0.240:8081')
+
+        # Print token_info to debug its structure
+        print("Token Info:", token_info)
+        print("Type of token_info:", type(token_info))
+
+        # Ensure token_info is a dictionary
+        if isinstance(token_info, str):
+            return jsonify({"error": "Invalid response from Splitwise, expected a dictionary"}), 500
+
         access_token = token_info.get('access_token')
-        print(access_token)
-        # Return the access token as part of the response
+
+
+        s.setOAuth2AccessToken(token_info)
+        expenses = s.getExpenses(offset=2)
+
+        for expense in expenses:
+            print(expense.getDetails(), expense.cost)
+
         return jsonify({"access_token": access_token}), 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/getuserdetails', methods=['GET'])
 def get_user_details():
