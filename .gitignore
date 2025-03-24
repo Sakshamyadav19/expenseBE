@@ -1,4 +1,2 @@
 .env
-splitwise.json
-expenses.db
-exptracker-458ef-firebase-adminsdk-fbsvc-3613564ef1.json
+./exptracker-458ef-firebase-adminsdk-fbsvc-3613564ef1.json
