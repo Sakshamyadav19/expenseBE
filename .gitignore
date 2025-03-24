@@ -1,2 +1,3 @@
 .env
-./exptracker-458ef-firebase-adminsdk-fbsvc-3613564ef1.json
+*.json
+exptracker-458ef-firebase-adminsdk-fbsvc-3613564ef1.json
