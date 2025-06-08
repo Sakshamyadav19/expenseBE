@@ -221,6 +221,9 @@ def google_oauth_callback():
     # Get the authorization code and state from Google's callback
     code = request.args.get('code')
     state = request.args.get('state')
+
+    print(code)
+    print(state)
     
     if not code:
         return jsonify({"error": "No authorization code received"}), 400
