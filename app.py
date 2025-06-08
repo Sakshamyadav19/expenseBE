@@ -26,6 +26,7 @@ except Exception as e:
 app = Flask(__name__)
 CORS(app)
 
+
 @app.route('/add-expense', methods=['POST'])
 def add_expense():
     data = request.get_json()
@@ -174,71 +175,8 @@ def get_user_details():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/exchange-code', methods=['POST'])
-def exchange_code():
-    """
-    Exchanges authorization code for access token using PKCE.
-    Called directly by the mobile app.
-    """
-    data = request.get_json()
-
-    if not data:
-        return jsonify({"error": "No JSON data provided"}), 400
-
-    code = data.get('code')
-    code_verifier = data.get('code_verifier')
-
-    if not code:
-        return jsonify({"error": "No authorization code provided"}), 400
-
-    if not code_verifier:
-        return jsonify({"error": "No code verifier provided"}), 400
-
-    try:
-        token_response = requests.post(
-            'https://oauth2.googleapis.com/token',
-            data={
-                'code': code,
-                'client_id': '373259036907-smqrgdrdijp3coobcl7f3i36tasvlf9r.apps.googleusercontent.com',
-                'client_secret': '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',
-                'redirect_uri': 'https://expensebe.onrender.com/google-oauth-callback',
-                'grant_type': 'authorization_code',
-                'code_verifier': code_verifier
-            },
-            headers={
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        )
-
-        if token_response.status_code != 200:
-            print(f"Token exchange failed: {token_response.text}")
-            return jsonify({"error": "Failed to exchange code for token", "details": token_response.text}), 500
-
-        token_data = token_response.json()
-        access_token = token_data.get('access_token')
-        refresh_token = token_data.get('refresh_token')
-        expires_in = token_data.get('expires_in')
-
-        if not access_token:
-            return jsonify({"error": "No access token in response"}), 500
-
-        return jsonify({
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "expires_in": expires_in,
-            "token_type": token_data.get('token_type', 'Bearer')
-        })
-
-    except Exception as e:
-        print(f"Error in code exchange: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-
 @app.route('/google-oauth-callback', methods=['GET'])
 def google_oauth_callback():
-    """
-    Handles the Google OAuth callback, exchanges code for token, and redirects to the app.
-    """
     code = request.args.get('code')
     state = request.args.get('state')
 
@@ -288,6 +226,69 @@ def google_oauth_callback():
     </body>
     </html>
     """
+
+
+@app.route('/exchange-code', methods=['POST'])
+def exchange_code():
+    """
+    Exchanges authorization code for access token using PKCE.
+    Called directly by the mobile app.
+    """
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+
+    code = data.get('code')
+    code_verifier = data.get('code_verifier')
+
+    if not code:
+        return jsonify({"error": "No authorization code provided"}), 400
+
+    if not code_verifier:
+        return jsonify({"error": "No code verifier provided"}), 400
+
+    try:
+        token_response = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'code': code,
+                'client_id': '373259036907-smqrgdrdijp3coobcl7f3i36tasvlf9r.apps.googleusercontent.com',
+                'client_secret': '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',
+                'redirect_uri': 'https://expensebe.onrender.com/google-oauth-callback',
+                'grant_type': 'authorization_code',
+                'code_verifier': code_verifier
+            },
+            headers={
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        )
+
+        if token_response.status_code != 200:
+            print(f"Token exchange failed: {token_response.text}")
+            return jsonify({
+                "error": "Failed to exchange code for token",
+                "details": token_response.text
+            }), 500
+
+        token_data = token_response.json()
+        access_token = token_data.get('access_token')
+        refresh_token = token_data.get('refresh_token')
+        expires_in = token_data.get('expires_in')
+
+        if not access_token:
+            return jsonify({"error": "No access token in response"}), 500
+
+        return jsonify({
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_in": expires_in,
+            "token_type": token_data.get('token_type', 'Bearer')
+        })
+
+    except Exception as e:
+        print(f"Error in code exchange: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == '__main__':
