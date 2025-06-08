@@ -215,50 +215,82 @@ def get_user_details():
 @app.route('/google-oauth-callback', methods=['GET'])
 def google_oauth_callback():
     """
-    Handles the Google OAuth callback and redirects to the app with the authorization code.
-    This endpoint should be registered as the redirect URI in Google Cloud Console.
+    Handles the Google OAuth callback, exchanges code for token, and redirects to the app.
     """
-    # Get the authorization code and state from Google's callback
     code = request.args.get('code')
     state = request.args.get('state')
-
-    print(code)
-    print(state)
     
     if not code:
         return jsonify({"error": "No authorization code received"}), 400
     
-    # Redirect to the app with the authorization code
-    # The app's custom URL scheme will be handled by Android
-    app_redirect_url = "exp+soothly://expo-development-client/?url=http%3A%2F%2F10.0.0.173%3A8082"
-    # if state:
-    #     app_redirect_url += f"&state={state}"
-    
-    # Return an HTML page that will handle the redirect to the app
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Redirecting to Soothly...</title>
-        <script>
-            // Try to redirect to the app
-            window.location.href = "{app_redirect_url}";
-            
-            // If the app doesn't open within 2 seconds, show a button
-            setTimeout(function() {{
-                document.getElementById('manual-redirect').style.display = 'block';
-            }}, 2000);
-        </script>
-    </head>
-    <body>
-        <h1>Redirecting to Soothly...</h1>
-        <p id="manual-redirect" style="display: none;">
-            If you are not redirected automatically, please 
-            <a href="{app_redirect_url}">click here</a> to open the app.
-        </p>
-    </body>
-    </html>
-    """
+    try:
+        # Exchange code for access token
+        token_response = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'code': code,
+                'client_id': '373259036907-smqrgdrdijp3coobcl7f3i36tasvlf9r.apps.googleusercontent.com',
+                'client_secret': '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',  # Make sure to add this to your .env file
+                'redirect_uri': 'https://expensebe.onrender.com/google-oauth-callback',
+                'grant_type': 'authorization_code'
+            },
+            headers={
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        )
+        
+        if token_response.status_code != 200:
+            print(f"Token exchange failed: {token_response.text}")
+            return jsonify({"error": "Failed to exchange code for token"}), 500
+
+        print(token_response)
+        
+        token_data = token_response.json()
+        access_token = token_data.get('access_token')
+        print(token_data)
+        print(access_token)
+        
+        if not access_token:
+            return jsonify({"error": "No access token in response"}), 500
+        
+        # Redirect to the app with the access token
+        app_redirect_url = f"com.sakshamyadav.Soothly://oauth2redirect?access_token={access_token}"
+        if state:
+            app_redirect_url += f"&state={state}"
+        
+        # Return HTML that will handle the redirect to the app
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Redirecting to Soothly...</title>
+            <script>
+                // Store the token in localStorage (this will be accessible to the app)
+                localStorage.setItem('gmail_access_token', '{access_token}');
+                
+                // Try to redirect to the app
+                window.location.href = "{app_redirect_url}";
+                
+                // If the app doesn't open within 2 seconds, show a button
+                setTimeout(function() {{
+                    document.getElementById('manual-redirect').style.display = 'block';
+                }}, 2000);
+            </script>
+        </head>
+        <body>
+            <h1>Redirecting to Soothly...</h1>
+            <p id="manual-redirect" style="display: none;">
+                If you are not redirected automatically, please 
+                <a href="{app_redirect_url}">click here</a> to open the app.
+            </p>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        print(f"Error in token exchange: {str(e)}")
+        return jsonify({"error": str(e)}), 500 
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
