@@ -230,9 +230,9 @@ def google_oauth_callback():
     
     # Redirect to the app with the authorization code
     # The app's custom URL scheme will be handled by Android
-    app_redirect_url = f"com.sakshamyadav.Soothly://oauth2redirect?code={code}"
-    if state:
-        app_redirect_url += f"&state={state}"
+    app_redirect_url = "exp+soothly://expo-development-client/?url=http%3A%2F%2F10.0.0.173%3A8082"
+    # if state:
+    #     app_redirect_url += f"&state={state}"
     
     # Return an HTML page that will handle the redirect to the app
     return f"""
