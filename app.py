@@ -26,7 +26,6 @@ except Exception as e:
 app = Flask(__name__)
 CORS(app)
 
-
 @app.route('/add-expense', methods=['POST'])
 def add_expense():
     data = request.get_json()
@@ -177,6 +176,10 @@ def get_user_details():
 
 @app.route('/exchange-code', methods=['POST'])
 def exchange_code():
+    """
+    Exchanges authorization code for access token using PKCE.
+    Called directly by the mobile app.
+    """
     data = request.get_json()
 
     if not data:
@@ -233,9 +236,11 @@ def exchange_code():
 
 @app.route('/google-oauth-callback', methods=['GET'])
 def google_oauth_callback():
+    """
+    Handles the Google OAuth callback, exchanges code for token, and redirects to the app.
+    """
     code = request.args.get('code')
     state = request.args.get('state')
-    print(code)
 
     if not code:
         return jsonify({"error": "No authorization code received"}), 400
@@ -244,27 +249,44 @@ def google_oauth_callback():
     if state:
         app_redirect_url += f"&state={state}"
 
+    print(f"Redirecting to app with URL: {app_redirect_url}")
+
     return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Redirecting to Soothly...</title>
-            <script>
-                window.location.href = "{app_redirect_url}";
-                setTimeout(function() {{
-                    document.getElementById('manual-redirect').style.display = 'block';
-                }}, 2000);
-            </script>
-        </head>
-        <body>
-            <h1>Redirecting to Soothly...</h1>
-            <p>Authorization successful! Redirecting to app...</p>
-            <p id="manual-redirect" style="display: none;">
-                If you are not redirected automatically, please 
-                <a href="{app_redirect_url}">click here</a> to open the app.
-            </p>
-        </body>
-        </html>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Redirecting to Soothly...</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script>
+            window.location.href = "{app_redirect_url}";
+            setTimeout(() => {{
+                document.getElementById('manual-redirect').style.display = 'block';
+            }}, 3000);
+        </script>
+        <style>
+            body {{
+                font-family: sans-serif;
+                text-align: center;
+                background: #f3f3f3;
+                padding: 40px;
+            }}
+            .btn {{
+                padding: 10px 20px;
+                background: #4CAF50;
+                color: white;
+                text-decoration: none;
+                border-radius: 5px;
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>Redirecting to Soothly...</h1>
+        <div id="manual-redirect" style="display:none;">
+            <p>If you are not redirected, click below:</p>
+            <a class="btn" href="{app_redirect_url}">Open Soothly App</a>
+        </div>
+    </body>
+    </html>
     """
 
 
