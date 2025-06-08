@@ -219,9 +219,13 @@ def google_oauth_callback():
     """
     code = request.args.get('code')
     state = request.args.get('state')
+    code_verifier = request.args.get('code_verifier')  # Get the code verifier from the request
     
     if not code:
         return jsonify({"error": "No authorization code received"}), 400
+    
+    if not code_verifier:
+        return jsonify({"error": "No code verifier received"}), 400
     
     try:
         # Exchange code for access token
@@ -230,9 +234,10 @@ def google_oauth_callback():
             data={
                 'code': code,
                 'client_id': '373259036907-smqrgdrdijp3coobcl7f3i36tasvlf9r.apps.googleusercontent.com',
-                'client_secret': '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',  # Make sure to add this to your .env file
+                'client_secret': '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',
                 'redirect_uri': 'https://expensebe.onrender.com/google-oauth-callback',
-                'grant_type': 'authorization_code'
+                'grant_type': 'authorization_code',
+                'code_verifier': code_verifier  # Add the code verifier to the request
             },
             headers={
                 'Content-Type': 'application/x-www-form-urlencoded'
@@ -242,13 +247,9 @@ def google_oauth_callback():
         if token_response.status_code != 200:
             print(f"Token exchange failed: {token_response.text}")
             return jsonify({"error": "Failed to exchange code for token"}), 500
-
-        print(token_response)
         
         token_data = token_response.json()
         access_token = token_data.get('access_token')
-        print(token_data)
-        print(access_token)
         
         if not access_token:
             return jsonify({"error": "No access token in response"}), 500
@@ -290,7 +291,6 @@ def google_oauth_callback():
     except Exception as e:
         print(f"Error in token exchange: {str(e)}")
         return jsonify({"error": str(e)}), 500 
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
