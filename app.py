@@ -212,23 +212,23 @@ def get_user_details():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/google-oauth-callback', methods=['GET'])
+@app.route('/google-oauth-callback')
 def google_oauth_callback():
-    """
-    Handles the Google OAuth callback, exchanges code for token, and redirects to the app.
-    """
     code = request.args.get('code')
     state = request.args.get('state')
-    code_verifier = request.args.get('code_verifier')  # Get the code verifier from the request
-    
-    if not code:
-        return jsonify({"error": "No authorization code received"}), 400
-    
-    if not code_verifier:
-        return jsonify({"error": "No code verifier received"}), 400
-    
+    print(code)
+
+    if not code or not state:
+        return jsonify({"error": "Missing code or state"}), 400
+
     try:
-        # Exchange code for access token
+        parsed_state = json.loads(state)
+        code_verifier = parsed_state.get("verifier")
+        print(code_verifier)
+
+        if not code_verifier:
+            return jsonify({"error": "Missing code_verifier"}), 400
+
         token_response = requests.post(
             'https://oauth2.googleapis.com/token',
             data={
@@ -237,60 +237,23 @@ def google_oauth_callback():
                 'client_secret': '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',
                 'redirect_uri': 'https://expensebe.onrender.com/google-oauth-callback',
                 'grant_type': 'authorization_code',
-                'code_verifier': code_verifier  # Add the code verifier to the request
+                'code_verifier': code_verifier
             },
-            headers={
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
+            headers={ 'Content-Type': 'application/x-www-form-urlencoded' }
         )
-        
+
         if token_response.status_code != 200:
-            print(f"Token exchange failed: {token_response.text}")
-            return jsonify({"error": "Failed to exchange code for token"}), 500
-        
+            return jsonify({"error": "Token exchange failed", "details": token_response.text}), 500
+        print(token_response)
         token_data = token_response.json()
+        print(token_data)
         access_token = token_data.get('access_token')
-        
-        if not access_token:
-            return jsonify({"error": "No access token in response"}), 500
-        
-        # Redirect to the app with the access token
-        app_redirect_url = f"com.sakshamyadav.Soothly://oauth2redirect?access_token={access_token}"
-        if state:
-            app_redirect_url += f"&state={state}"
-        
-        # Return HTML that will handle the redirect to the app
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Redirecting to Soothly...</title>
-            <script>
-                // Store the token in localStorage (this will be accessible to the app)
-                localStorage.setItem('gmail_access_token', '{access_token}');
-                
-                // Try to redirect to the app
-                window.location.href = "{app_redirect_url}";
-                
-                // If the app doesn't open within 2 seconds, show a button
-                setTimeout(function() {{
-                    document.getElementById('manual-redirect').style.display = 'block';
-                }}, 2000);
-            </script>
-        </head>
-        <body>
-            <h1>Redirecting to Soothly...</h1>
-            <p id="manual-redirect" style="display: none;">
-                If you are not redirected automatically, please 
-                <a href="{app_redirect_url}">click here</a> to open the app.
-            </p>
-        </body>
-        </html>
-        """
-        
+        print(access_token)
+
+        return jsonify({ "access_token": access_token })
+
     except Exception as e:
-        print(f"Error in token exchange: {str(e)}")
-        return jsonify({"error": str(e)}), 500 
+        return jsonify({ "error": str(e) }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
