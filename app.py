@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 import firebase_admin
 from firebase_admin import credentials, firestore, exceptions
 from flask_cors import CORS
@@ -13,6 +13,7 @@ FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH")
 SPLITWISE_CONSUMER_KEY = os.getenv("SPLITWISE_CONSUMER_KEY")
 SPLITWISE_CONSUMER_SECRET = os.getenv("SPLITWISE_CONSUMER_SECRET")
 SPLITWISE_TOKEN = os.getenv("SPLITWISE_TOKEN")
+WEB_CLIENT_ID = os.getenv("WEB_CLIENT_ID")  # Add your Google OAuth Web Client ID to .env
 
 cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
 firebase_admin.initialize_app(cred)
@@ -25,7 +26,6 @@ except Exception as e:
 
 app = Flask(__name__)
 CORS(app)
-
 
 @app.route('/add-expense', methods=['POST'])
 def add_expense():
@@ -179,53 +179,22 @@ def get_user_details():
 def google_oauth_callback():
     code = request.args.get('code')
     state = request.args.get('state')
+    error = request.args.get('error')
+
+    if error:
+        print(f"OAuth error: {error}")
+        return redirect(f"com.sakshamyadav.Soothly://oauth2redirect?error={error}", code=302)
 
     if not code:
-        return jsonify({"error": "No authorization code received"}), 400
+        print("No authorization code received")
+        return redirect("com.sakshamyadav.Soothly://oauth2redirect?error=no_code", code=302)
 
     app_redirect_url = f"com.sakshamyadav.Soothly://oauth2redirect?code={code}"
     if state:
         app_redirect_url += f"&state={state}"
 
-    print(f"Redirecting to app with URL: {app_redirect_url}")
-
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Redirecting to Soothly...</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script>
-            window.location.href = "{app_redirect_url}";
-            setTimeout(() => {{
-                document.getElementById('manual-redirect').style.display = 'block';
-            }}, 3000);
-        </script>
-        <style>
-            body {{
-                font-family: sans-serif;
-                text-align: center;
-                background: #f3f3f3;
-                padding: 40px;
-            }}
-            .btn {{
-                padding: 10px 20px;
-                background: #4CAF50;
-                color: white;
-                text-decoration: none;
-                border-radius: 5px;
-            }}
-        </style>
-    </head>
-    <body>
-        <h1>Redirecting to Soothly...</h1>
-        <div id="manual-redirect" style="display:none;">
-            <p>If you are not redirected, click below:</p>
-            <a class="btn" href="{app_redirect_url}">Open Soothly App</a>
-        </div>
-    </body>
-    </html>
-    """
+    print(f"Redirecting to app: {app_redirect_url}")
+    return redirect(app_redirect_url, code=302)
 
 
 @app.route('/exchange-code', methods=['POST'])
@@ -254,7 +223,6 @@ def exchange_code():
             data={
                 'code': code,
                 'client_id': '373259036907-smqrgdrdijp3coobcl7f3i36tasvlf9r.apps.googleusercontent.com',
-                'client_secret': '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',
                 'redirect_uri': 'https://expensebe.onrender.com/google-oauth-callback',
                 'grant_type': 'authorization_code',
                 'code_verifier': code_verifier
@@ -266,10 +234,7 @@ def exchange_code():
 
         if token_response.status_code != 200:
             print(f"Token exchange failed: {token_response.text}")
-            return jsonify({
-                "error": "Failed to exchange code for token",
-                "details": token_response.text
-            }), 500
+            return jsonify({"error": "Failed to exchange code for token", "details": token_response.text}), 500
 
         token_data = token_response.json()
         access_token = token_data.get('access_token')
