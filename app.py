@@ -14,6 +14,8 @@ SPLITWISE_CONSUMER_KEY = os.getenv("SPLITWISE_CONSUMER_KEY")
 SPLITWISE_CONSUMER_SECRET = os.getenv("SPLITWISE_CONSUMER_SECRET")
 WEB_CLIENT_ID = os.getenv("WEB_CLIENT_ID")
 WEB_CLIENT_SECRET = os.getenv("WEB_CLIENT_SECRET")
+EXPO_DEV_IP = os.getenv("EXPO_DEV_IP")
+EXPO_DEV_PORT = "8082" 
 
 cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
 firebase_admin.initialize_app(cred)
@@ -153,62 +155,100 @@ def get_user_details():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 @app.route('/google-oauth-callback', methods=['GET'])
 def google_oauth_callback():
+    """
+    Handles the Google OAuth callback and redirects directly to the app.
+    """
     code = request.args.get('code')
     state = request.args.get('state')
     error = request.args.get('error')
-
+    
+    # Base URL for Expo development client
+    expo_base_url = f"exp+soothly://expo-development-client/?url=http%3A%2F%2F{EXPO_DEV_IP}%3A{EXPO_DEV_PORT}"
+    
+    # Handle OAuth errors
     if error:
-        return redirect(f"com.sakshamyadav.Soothly://oauth2redirect?error={error}", code=302)
+        print(f"OAuth error: {error}")
+        app_redirect_url = f"{expo_base_url}?error={error}"
+        return redirect(app_redirect_url, code=302)
+    
     if not code:
-        return redirect("com.sakshamyadav.Soothly://oauth2redirect?error=no_code", code=302)
-
-    app_redirect_url = f"com.sakshamyadav.Soothly://oauth2redirect?code={code}"
+        print("No authorization code received")
+        app_redirect_url = f"{expo_base_url}?error=no_code"
+        return redirect(app_redirect_url, code=302)
+    
+    # Build redirect URL with code and state
+    app_redirect_url = f"{expo_base_url}?code={code}"
     if state:
         app_redirect_url += f"&state={state}"
-
+    
+    print(f"Redirecting to app: {app_redirect_url}")
+    
+    # Direct redirect to mobile app
     return redirect(app_redirect_url, code=302)
 
 @app.route('/exchange-code', methods=['POST'])
 def exchange_code():
+    """
+    Exchanges authorization code for access token using PKCE.
+    Called directly by the mobile app.
+    """
     data = request.get_json()
+    
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
     code = data.get('code')
     code_verifier = data.get('code_verifier')
-
-    if not code or not code_verifier:
-        return jsonify({"error": "Missing code or code_verifier"}), 400
-
+    
+    if not code:
+        return jsonify({"error": "No authorization code provided"}), 400
+    
+    if not code_verifier:
+        return jsonify({"error": "No code verifier provided"}), 400
+    
     try:
+        # Exchange code for access token using Web OAuth client
+        # Note: Web clients require both client_id and client_secret
         token_response = requests.post(
             'https://oauth2.googleapis.com/token',
             data={
                 'code': code,
-                'client_id': WEB_CLIENT_ID,
-                'client_secret': WEB_CLIENT_SECRET,
-                'redirect_uri': 'https://expensebe.onrender.com/google-oauth-callback',
+                'client_id': WEB_CLIENT_ID,  # Use web client for backend redirect
+                'client_secret': WEB_CLIENT_SECRET,  # Use web client secret for backend redirect
+                'redirect_uri': 'https://expensebe.onrender.com/google-oauth-callback',  # Web redirect URI for auth flow
                 'grant_type': 'authorization_code',
-                'code_verifier': code_verifier
+                'code_verifier': code_verifier  # PKCE verifier
             },
-            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            headers={
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
         )
-
+        
         if token_response.status_code != 200:
-            return jsonify({
-                "error": "Token exchange failed",
-                "details": token_response.text
-            }), 500
-
+            print(f"Token exchange failed: {token_response.text}")
+            return jsonify({"error": "Failed to exchange code for token", "details": token_response.text}), 500
+        
         token_data = token_response.json()
+        access_token = token_data.get('access_token')
+        refresh_token = token_data.get('refresh_token')
+        expires_in = token_data.get('expires_in')
+        
+        if not access_token:
+            return jsonify({"error": "No access token in response"}), 500
+        
         return jsonify({
-            "access_token": token_data.get('access_token'),
-            "refresh_token": token_data.get('refresh_token'),
-            "expires_in": token_data.get('expires_in'),
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_in": expires_in,
             "token_type": token_data.get('token_type', 'Bearer')
         })
-
+        
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error in code exchange: {str(e)}")
+        return jsonify({"error": str(e)}), 500 
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
