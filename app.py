@@ -9,9 +9,6 @@ import requests
 
 # Load credentials from environment variables
 load_dotenv(dotenv_path=".env")
-FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH")
-SPLITWISE_CONSUMER_KEY = os.getenv("SPLITWISE_CONSUMER_KEY")
-SPLITWISE_CONSUMER_SECRET = os.getenv("SPLITWISE_CONSUMER_SECRET")
 WEB_CLIENT_ID = os.getenv("WEB_CLIENT_ID")
 WEB_CLIENT_SECRET = os.getenv("WEB_CLIENT_SECRET")
 EXPO_DEV_IP = os.getenv("EXPO_DEV_IP")
@@ -29,87 +26,7 @@ except Exception as e:
 app = Flask(__name__)
 CORS(app)
 
-@app.route('/add-expense', methods=['POST'])
-def add_expense():
-    data = request.get_json()
-    required_fields = ['email', 'title', 'amount', 'category']
-    if not data or not all(field in data for field in required_fields):
-        return jsonify({'error': 'Missing required fields: email, title, amount, category'}), 400
 
-    email = data['email']
-    title = data['title']
-    amount = data['amount']
-    category = data['category']
-
-    if '@' not in email:
-        return jsonify({'error': 'Invalid email format'}), 400
-    if amount <= 0:
-        return jsonify({'error': 'Amount must be greater than 0'}), 400
-
-    try:
-        expense_item = {'title': title, 'amount': amount, 'category': category}
-        user_ref = db.collection('users').document(email)
-        doc = user_ref.get()
-        if doc.exists:
-            user_ref.update({"expenses": firestore.ArrayUnion([expense_item])})
-        else:
-            user_ref.set({"expenses": [expense_item], "access_token": ""})
-
-        return jsonify({'message': 'Expense added successfully'}), 200
-
-    except exceptions.FirebaseError as e:
-        return jsonify({'error': f'Failed to add expense: {str(e)}'}), 500
-
-@app.route('/get-expenses', methods=['GET'])
-def get_expense():
-    email = request.args.get('email')
-    if not email:
-        return jsonify({"error": "Email parameter is required"}), 400
-
-    try:
-        user_doc = db.collection('users').document(email).get()
-        if user_doc.exists:
-            data = user_doc.to_dict()
-            expenses = data.get("expenses", [])
-            access_token = data.get("access_token", "")
-
-            if access_token:
-                response = requests.get(
-                    "https://secure.splitwise.com/api/v3.0/get_friends",
-                    headers={
-                        "Authorization": f"Bearer {access_token}",
-                        "Content-Type": "application/json"
-                    }
-                )
-                if response.status_code == 200:
-                    friend_data = response.json()
-                    overall_balance = sum(
-                        float(entry.get("amount", 0))
-                        for friend in friend_data.get("friends", [])
-                        for entry in friend.get("balance", [])
-                    )
-                    expenses.append({
-                        "title": "Splitwise",
-                        "category": "others",
-                        "amount": overall_balance
-                    })
-                else:
-                    print("Failed to fetch balances:", response.status_code)
-
-            return jsonify(expenses), 200
-        return jsonify([]), 200
-
-    except Exception as e:
-        print(e)
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/authsplitwise', methods=['GET'])
-def initiate_splitwise_oauth():
-    redirect_uri = request.args.get('redirect_uri')
-    if not redirect_uri:
-        return jsonify({"error": "Missing redirect_uri parameter"}), 400
-    url, state = s.getOAuth2AuthorizeURL(redirect_uri)
-    return jsonify({"url": url, "state": state})
 
 @app.route('/callback', methods=['GET'])
 def handle_splitwise_callback():
