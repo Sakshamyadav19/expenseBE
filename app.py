@@ -15,7 +15,7 @@ SPLITWISE_CONSUMER_SECRET = os.getenv("SPLITWISE_CONSUMER_SECRET")
 WEB_CLIENT_ID = os.getenv("WEB_CLIENT_ID")
 WEB_CLIENT_SECRET = os.getenv("WEB_CLIENT_SECRET")
 EXPO_DEV_IP = os.getenv("EXPO_DEV_IP")
-EXPO_DEV_PORT = "8082" 
+EXPO_DEV_PORT = "8081" 
 
 cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
 firebase_admin.initialize_app(cred)
