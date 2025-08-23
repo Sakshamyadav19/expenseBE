@@ -105,6 +105,8 @@ def exchange_code():
     Called directly by the mobile app.
     """
     data = request.get_json()
+    print(WEB_CLIENT_ID)
+    print(WEB_CLIENT_SECRET)
     
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
